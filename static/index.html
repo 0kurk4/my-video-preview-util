@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+</head>
+
+<body>
+
+  <h1>Content</h1>
+
+
+<h2 id="status">Ready</h2>
+
+<form>
+    <input type="button" value="JS TEST" id="js_test" onclick="formOnClick()"/>
+</form>
+
+<h3 id="file_name"></h3>
+<h4 id="duration"></h4>
+<img id="preview_image" />
+
+<script>
+    console.log('script working');
+
+    async function formOnClick() {
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = 'Loading video metadata...';
+
+        const buttonEl = document.getElementById('js_test');
+        buttonEl.setAttribute("disabled", "disabled");
+
+        let response = await fetch('/getFilePath');
+        let text = await response.text();
+
+        console.log(text);
+        setTimeout(fetchPreviewProgress, 200);
+    }
+
+    async function fetchPreviewProgress() {
+        let response = await fetch('/progress');
+        let text = await response.text();
+
+        if (text === 'PROGRESS') {
+            console.log('progress')
+            setTimeout(fetchPreviewProgress, 200);
+        } else if (text === 'FINISHED') {
+            response = await fetch('/getPreview');
+            text = await response.json();
+
+            console.log(text);
+
+            const { duration, previewFilePath, fileName } = text;
+            const imgEl = document.getElementById('preview_image');
+            imgEl.src = '/preview/' + previewFilePath;
+
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = 'Video metadata loaded.';
+
+            const buttonEl = document.getElementById('js_test');
+            buttonEl.removeAttribute("disabled");
+
+            const fileNameEl = document.getElementById('file_name');
+            fileNameEl.innerText = fileName;
+            
+            const durationEl = document.getElementById('duration');
+            durationEl.innerText = duration < 3600 
+                ? (new Date(duration * 1000).toISOString().substring(14, 19))
+                : (new Date(duration * 1000).toISOString().substring(11, 16));
+        }
+    }
+</script>
+</body>
+</html>
