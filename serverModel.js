@@ -22,31 +22,30 @@ ServerAppModel.prototype.statusDetail = function () {
     return this.serverStatusDetail;
 }
 
-ServerAppModel.prototype.setIdle = function () {
+ServerAppModel.prototype.setIdle = function (detail = undefined) {
     this.serverStatus = STATUS_IDLE;
-    this.serverStatusDetail = undefined;
+    this.serverStatusDetail = detail;
 }
 
-ServerAppModel.prototype.setProgress = function (progress = undefined) {
+ServerAppModel.prototype.setProgress = function (detail = undefined) {
     this.serverStatus = STATUS_PROGRESS;
-    this.serverStatusDetail = progress;
+    this.serverStatusDetail = detail;
 }
 
-ServerAppModel.prototype.setDialog = function () {
+ServerAppModel.prototype.setDialog = function (detail = undefined) {
     this.serverStatus = STATUS_DIALOG;
-    this.serverStatusDetail = undefined;
+    this.serverStatusDetail = detail;
 }
 
-ServerAppModel.prototype.setFinished = function () {
+ServerAppModel.prototype.setFinished = function (detail = undefined) {
     this.serverStatus = STATUS_FINISHED;
-    this.serverStatusDetail = undefined;
+    this.serverStatusDetail = detail;
 }
 
-ServerAppModel.prototype.setError = function (err) {
+ServerAppModel.prototype.setError = function (detail = undefined) {
     this.serverStatus = STATUS_ERROR;
-    this.serverStatusDetail = err;
-    console.log('this.serverStatusDetail');
-    console.log(this.serverStatusDetail);
+    this.serverStatusDetail = detail;
+    // console.log(`set error ${detail}`);
 }
 
 ////////////////////////////////////////////////

@@ -12,7 +12,7 @@
 <h2 id="status">Ready</h2>
 
 <form>
-    <input type="button" value="JS TEST" id="js_test" onclick="formOnClick()"/>
+    <input type="button" value="Select video file" id="select_video_btn" onclick="onSelectVideoBtnClick()" disabled />
 </form>
 
 <h3 id="file_name"></h3>
@@ -20,81 +20,135 @@
 <img id="preview_image" />
 
 <script>
-    console.log('script working');
+    console.log('Client start');
+    checkForFFMpeg();
 
-    async function formOnClick() {
-        const statusEl = document.getElementById('status');
-        statusEl.innerText = 'Dialog is opened.';
+    async function checkForFFMpeg() {
+        const response = await fetch('/serverStatus');
+        const text = await response.text();
+        console.log(`checkForFFMpeg ${text}`);
 
-        const buttonEl = document.getElementById('js_test');
-        buttonEl.setAttribute("disabled", "disabled");
+        if (text === 'STATUS_ERROR') {
+            getStatusDetail();
+        } else {
+            enableForm();
+        }
+    }
 
-        let response = await fetch('/getFilePath');
-        let text = await response.text();
+    async function onSelectVideoBtnClick() {
+        disableForm();
 
-        console.log(text);
+        const response = await fetch('/getFilePath');
+        const text = await response.text();
+
+        // console.log(text);
         setTimeout(fetchServerStatus, 200);
     }
 
     async function fetchServerStatus() {
-        let response = await fetch('/serverStatus');
-        let text = await response.text();
-        console.log('Server status ' + text);
-        const statusEl = document.getElementById('status');
+        const response = await fetch('/serverStatus');
+        const text = await response.text();
 
-        if (text === 'STATUS_PROGRESS') {
-            console.log('progress')
-            statusEl.innerText = 'Loading video metadata...';
-            setTimeout(fetchServerStatus, 200);
-        } else if (text === 'STATUS_DIALOG') {
-            console.log('dialog')
-            statusEl.innerText = 'Dialog is opened.';
-            setTimeout(fetchServerStatus, 200);
-        } else if (text === 'STATUS_FINISHED') {
-            response = await fetch('/getPreview');
-            text = await response.json();
-
-            console.log(text);
-
-            const { duration, previewFilePath, fileName } = text;
-            const imgEl = document.getElementById('preview_image');
-            imgEl.src = '/preview/' + previewFilePath;
-
-            statusEl.innerText = 'Video metadata loaded.';
-
-            const buttonEl = document.getElementById('js_test');
-            buttonEl.removeAttribute("disabled");
-
-            const fileNameEl = document.getElementById('file_name');
-            fileNameEl.innerText = fileName;
-
-            console.log(new Date(duration * 1000).toISOString());
-            
-            const durationEl = document.getElementById('duration');
-            durationEl.innerText = duration < 3600 
-                ? (new Date(duration * 1000).toISOString().substring(14, 19))
-                : (new Date(duration * 1000).toISOString().substring(11, 19));
-
-            confirmFinish();
-        } else if (text === 'STATUS_ERROR') {
-            checkForError();
-        } else {
-            throw new Error(`PROGRESS_EP error, response not parsed: ${text}`);
-        }
-
-        async function checkForError() {
-            let response = await fetch('/serverStatusDetail');
-            let text = await response.text();
-            console.log(`Server Status DETAIL: ${text}`);
-            const statusEl = document.getElementById('status');
-            statusEl.innerText = text;
-            confirmFinish();
-        }
-
-        async function confirmFinish() {
-            let response = await fetch('/clientFinish');
+        // console.log('Server status ' + text);
+        getStatusDetail();
+        switch(text) {
+            case 'STATUS_PROGRESS':
+            case 'STATUS_DIALOG':
+                handleProgress();
+                break;
+            // case 'STATUS_DIALOG':
+            //     handleDialog();
+            //     break;
+            case 'STATUS_FINISHED':
+                handleFinished();
+                fetchMetadata();
+                break;
+            case 'STATUS_ERROR':
+                handleError();
+                break;
+            default:
+                throw new Error(`STATUS_EP error, response not parsed: ${text}`);
         }
     }
+
+    async function fetchMetadata() {
+        const response = await fetch('/getMetadata');
+        const text = await response.text();
+
+        const decoded = JSON.parse(new TextDecoder().decode(base64ToBytes(text)));
+        console.dir(decoded);
+    }
+
+    function handleProgress() {
+        console.log('handleProgress');
+        setTimeout(fetchServerStatus, 200);
+    }
+
+    function handleDialog() {
+        console.log('handleDialog');
+        setTimeout(fetchServerStatus, 200);
+    }
+
+    async function handleFinished() {
+        console.log('handleFinished');
+        const response = await fetch('/getPreview');
+        const text = await response.json();
+
+        console.log(text);
+
+        const { duration, previewFilePath, fileName } = text;
+        const imgEl = document.getElementById('preview_image');
+        imgEl.src = '/preview/' + previewFilePath;
+
+        const fileNameEl = document.getElementById('file_name');
+        fileNameEl.innerText = fileName;
+        
+        const durationEl = document.getElementById('duration');
+        durationEl.innerText = duration < 3600 
+            ? (new Date(duration * 1000).toISOString().substring(14, 19))
+            : (new Date(duration * 1000).toISOString().substring(11, 19));
+
+        confirmFinish();
+        enableForm();
+    }
+
+    async function handleError() {
+        console.log('handleError');
+        await getStatusDetail();
+        confirmFinish();
+        enableForm();
+    }
+
+    async function getStatusDetail() {
+        const response = await fetch('/serverStatusDetail');
+        const text = await response.text();
+
+        const decoded = new TextDecoder().decode(base64ToBytes(text));
+
+        console.log(`Server Status DETAIL: ${decoded}`);
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = decoded;
+    }
+
+    async function confirmFinish() {
+        const response = await fetch('/clientFinish');
+    }
+
+    function disableForm() {
+        const buttonEl = document.getElementById('select_video_btn');
+        buttonEl.setAttribute("disabled", "disabled");
+    }
+
+    function enableForm() {
+        const buttonEl = document.getElementById('select_video_btn');
+        buttonEl.removeAttribute("disabled");
+    }
+
+    function base64ToBytes(base64) {
+        const binString = atob(base64);
+        return Uint8Array.from(binString, (m) => m.codePointAt(0));
+    }
+    
 </script>
 </body>
 </html>

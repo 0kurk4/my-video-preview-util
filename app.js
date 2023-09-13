@@ -12,6 +12,7 @@ const {
   SERVER_STATUS_EP,
   SERVER_STATUS_DETAIL_EP,
   GET_PREVIEW_EP,
+  GET_METADATA_EP,
   SET_CLIENT_FINISH_EP
 } = require('./serverAppCfg');
 const serverApp = express();
@@ -27,7 +28,9 @@ const serverModel = new ServerAppModel();
 
 // Import util functions
 const {
-  getFilePath
+  getFilePath,
+  base64ToBytes,
+  bytesToBase64
 } = require('./utils');
 
 
@@ -49,7 +52,7 @@ serverApp.get(MAIN_EP, function (req, res) {
 // Invoke Select File dialog
 serverApp.get(GET_FILE_PATH_EP, (req, res) => {
   console.log(`${GET_FILE_PATH_EP} endpoint`);
-  serverModel.setDialog();
+  serverModel.setDialog('Dialog is opened.');
   res.send(`Open file dialog on ${GET_FILE_PATH_EP}`);
 
   // Open system dialog
@@ -65,8 +68,10 @@ serverApp.get(SERVER_STATUS_EP, (req, res) => {
 
 // Retrieve server status detail
 serverApp.get(SERVER_STATUS_DETAIL_EP, (req, res) => {
-  console.log(`${SERVER_STATUS_DETAIL_EP} endpoint`);
-  res.send(serverModel.statusDetail());
+  console.log(`${SERVER_STATUS_DETAIL_EP} endpoint ` + serverModel.statusDetail());
+
+  const base64 = bytesToBase64(new TextEncoder().encode(serverModel.statusDetail()));
+  res.send(base64);
 });
 
 // Retrieve preview picture
@@ -77,6 +82,15 @@ serverApp.get(GET_PREVIEW_EP, (req, res) => {
   res.send({ duration, previewFilePath: serverModel.previewPath(), fileName: path.basename(serverModel.sourcePath()) });
 });
 
+// Retrieve metadata
+serverApp.get(GET_METADATA_EP, (req, res) => {
+  console.log(`${GET_METADATA_EP} endpoint`);
+
+  const metadata = serverModel.sourceMetadata();
+  const base64 = bytesToBase64(new TextEncoder().encode(JSON.stringify(metadata)));
+  res.send(base64);
+});
+
 // Acknowledge client finished operation, set server ready for next process
 serverApp.get(SET_CLIENT_FINISH_EP, (req, res) => {
   console.log(`${SET_CLIENT_FINISH_EP} endpoint`);
@@ -85,6 +99,16 @@ serverApp.get(SET_CLIENT_FINISH_EP, (req, res) => {
   serverModel.setIdle();
 });
 
+
+function checkFFMpeg() {
+  ffmpeg.getAvailableFormats(function(err, formats) {
+    if (err != null || formats === undefined) {
+      console.log(err);
+      serverModel.setError('ERROR! FFMpeg is not installed on this system.');
+    }
+  });
+}
+checkFFMpeg();
 
 
 function onFilePathResult(data) {
@@ -126,20 +150,21 @@ function getFileMetadata() {
     try {
       // console.dir(metadata);
       serverModel.setSourceMetadata(metadata);
+      serverModel.setProgress('Video metadata loaded.');
       generatePreview();
     }
     catch (err) {
+      // ERROR. Selected file is not supported.
       serverModel.setError(err);
       console.error('error> ' + err);
     }
     finally {
-      console.log('fin');
+      console.log('getFileMetadata finaly');
     }
   });
 }
 
 function generatePreview() {
-  console.dir('serverModel.getSourceFileMetadata()')
   const { width, height, duration } = serverModel.sourceMetadata()['streams'][0];
   const pictureWidth = 160;
   const pictureHeight = Math.round(pictureWidth * height / width);
@@ -149,12 +174,12 @@ function generatePreview() {
 
   const proc = ffmpeg(serverModel.sourcePath())
     .on('filenames', function (fileNames) {
-      console.log('screenshots are ' + fileNames.join(', '));
+      console.log('Preview file name is ' + fileNames.join(''));
       serverModel.setPreviewPath(fileNames[0])
     })
     .on('end', function () {
-      console.log('screenshots were saved');
-      serverModel.setFinished();
+      console.log('Preview was saved');
+      serverModel.setFinished('Preview is ready');
     })
     .on('error', function (err) {
       console.log('an error happened: ' + err.message);
