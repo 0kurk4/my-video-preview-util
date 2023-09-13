@@ -30,7 +30,10 @@ const serverModel = new ServerAppModel();
 const {
   getFilePath,
   base64ToBytes,
-  bytesToBase64
+  bytesToBase64,
+  getVideoStreamFromMetadata,
+  getPictureSize,
+  getTimePosition
 } = require('./utils');
 
 
@@ -78,7 +81,7 @@ serverApp.get(SERVER_STATUS_DETAIL_EP, (req, res) => {
 serverApp.get(GET_PREVIEW_EP, (req, res) => {
   console.log(`${GET_PREVIEW_EP} endpoint`);
 
-  const { width, height, duration } = serverModel.sourceMetadata()['streams'][0];
+  const { width, height, duration } = getVideoStreamFromMetadata(serverModel.sourceMetadata());
   res.send({ duration, previewFilePath: serverModel.previewPath(), fileName: path.basename(serverModel.sourcePath()) });
 });
 
@@ -165,26 +168,24 @@ function getFileMetadata() {
 }
 
 function generatePreview() {
-  const { width, height, duration } = serverModel.sourceMetadata()['streams'][0];
-  const pictureWidth = 160;
-  const pictureHeight = Math.round(pictureWidth * height / width);
-
-  const timePosition = duration > 30 ? '00:00:15.000' : (duration > 2 ? '00:00:05.000' : '00:00:00.500');
-  const size = `${pictureWidth}x${pictureHeight}`;
+  const { width, height, duration } = getVideoStreamFromMetadata(serverModel.sourceMetadata());
+  const timePosition = getTimePosition(duration);
+  const size = getPictureSize(width, height);
 
   const proc = ffmpeg(serverModel.sourcePath())
     .on('filenames', function (fileNames) {
       console.log('Preview file name is ' + fileNames.join(''));
-      serverModel.setPreviewPath(fileNames[0])
+      serverModel.setPreviewPath(fileNames[0]);
     })
     .on('end', function () {
       console.log('Preview was saved');
       serverModel.setFinished('Preview is ready');
     })
     .on('error', function (err) {
+      serverModel.setError(err.message);
       console.log('an error happened: ' + err.message);
     })
-    .screenshots({ fastSeek: true, timemarks: [timePosition], size, filename: 'tn_%b', folder: './static/preview' });
+    .screenshots({ fastSeek: true, timemarks: [timePosition], size, filename: 'prev_%b', folder: './static/preview' });
 }
 
 

@@ -1,3 +1,4 @@
 /node_modules
 /static/preview
+/static/thumbnails
 package-lock.json

@@ -1,5 +1,7 @@
 const path = require('path');
 
+const PICTURE_WIDTH = 160;
+
 function getFilePath(data) {
   // Cast byte buffer into string
   const stringData = '' + data;
@@ -22,8 +24,23 @@ function bytesToBase64(bytes) {
   return btoa(binString);
 }
 
+// Assume we have one video stream per file
+function getVideoStreamFromMetadata(metadata) {
+  const { streams } = metadata;
+  return streams.filter((stream) => stream['codec_type'] === 'video').shift();
+}
+
+function getPictureSize(width, height) {
+  return `${PICTURE_WIDTH}x${Math.round(PICTURE_WIDTH * height / width)}`;
+}
+
+getTimePosition = duration => duration > 60 ? '00:00:30.000' : (duration > 2 ? '00:00:15.000' : '00:00:00.500');
+
 module.exports = {
   getFilePath,
   base64ToBytes,
-  bytesToBase64
+  bytesToBase64,
+  getVideoStreamFromMetadata,
+  getPictureSize,
+  getTimePosition
 }
