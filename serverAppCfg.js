@@ -1,16 +1,20 @@
 const PORT = 3000;
 
-const MAIN_PATH_EP = '/';
+const MAIN_EP = '/';
 const GET_FILE_PATH_EP = '/getFilePath';
 const GET_DIRECTORY_PATH_EP = '/getDirectoryPath';
-const PROGRESS_EP = '/progress';
-const GET_PREVIEW = '/getPreview';
+const SERVER_STATUS_EP = '/serverStatus';
+const SERVER_STATUS_DETAIL_EP = '/serverStatusDetail';
+const GET_PREVIEW_EP = '/getPreview';
+const SET_CLIENT_FINISH_EP = '/clientFinish'
 
 module.exports = {
     PORT,
-    MAIN_PATH_EP,
+    MAIN_EP,
     GET_FILE_PATH_EP,
     GET_DIRECTORY_PATH_EP,
-    PROGRESS_EP,
-    GET_PREVIEW
+    SERVER_STATUS_EP,
+    SERVER_STATUS_DETAIL_EP,
+    GET_PREVIEW_EP,
+    SET_CLIENT_FINISH_EP
 }

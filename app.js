@@ -4,87 +4,132 @@ const openDialog = require("./psScripts").openDialog;
 
 // Setup Server app
 const express = require('express');
-const serverApp = express();
 const {
   PORT,
-  MAIN_PATH_EP,
+  MAIN_EP,
   GET_FILE_PATH_EP,
   GET_DIRECTORY_PATH_EP,
-  PROGRESS_EP,
-  GET_PREVIEW
+  SERVER_STATUS_EP,
+  SERVER_STATUS_DETAIL_EP,
+  GET_PREVIEW_EP,
+  SET_CLIENT_FINISH_EP
 } = require('./serverAppCfg');
+const serverApp = express();
+
+// Setup Server model
+const {
+  ServerAppModel,
+  STATUS_IDLE,
+  STATUS_PROGRESS,
+  STATUS_FINISHED
+} = require('./serverModel');
+const serverModel = new ServerAppModel();
+
+// Import util functions
+const {
+  getFilePath
+} = require('./utils');
 
 
-
+// Map root folder
 serverApp.use(express.static(__dirname + '/static'));
 
+// Run server
 serverApp.listen(PORT, () => {
   console.log(`Example app listening on port ${PORT}`)
 });
 
-// Main page
-serverApp.get(MAIN_PATH_EP, function(req, res) {
+// Server endpoints
+//
+// Main page (static HTML)
+serverApp.get(MAIN_EP, function (req, res) {
   res.send('index.html');
 });
 
-let FilePath;
-let FileMetadata;
-let PreviewFilePath;
-let PreviewFileProgress;
+// Invoke Select File dialog
+serverApp.get(GET_FILE_PATH_EP, (req, res) => {
+  console.log(`${GET_FILE_PATH_EP} endpoint`);
+  serverModel.setDialog();
+  res.send(`Open file dialog on ${GET_FILE_PATH_EP}`);
 
-async function onFilePathResult(data) {
-    console.log('testResutFunction: ' + data);
-    console.log(data.length);
-    if (data.length > 1) {
-      FilePath = getFilePath(data);
-      console.log('filepath> ' + FilePath);
-      onFileMetadata(FilePath);
-    }
-}
+  // Open system dialog
+  openDialog(onFilePathResult, onFilePathError, 1);
+  // DUMMY_onFilePathResult();
+})
 
-function DUMMY_onFilePathResult() {
-    FilePath = 'C:/Users/Admin/Documents/expressapp/big_buck_bunny_480p_h264.mov';
-    console.log('DUMMY_filepath> ' + FilePath);
-    onFileMetadata(FilePath);
+// Retrieve server status
+serverApp.get(SERVER_STATUS_EP, (req, res) => {
+  console.log(`${SERVER_STATUS_EP} endpoint`);
+  res.send(serverModel.status());
+});
+
+// Retrieve server status detail
+serverApp.get(SERVER_STATUS_DETAIL_EP, (req, res) => {
+  console.log(`${SERVER_STATUS_DETAIL_EP} endpoint`);
+  res.send(serverModel.statusDetail());
+});
+
+// Retrieve preview picture
+serverApp.get(GET_PREVIEW_EP, (req, res) => {
+  console.log(`${GET_PREVIEW_EP} endpoint`);
+
+  const { width, height, duration } = serverModel.sourceMetadata()['streams'][0];
+  res.send({ duration, previewFilePath: serverModel.previewPath(), fileName: path.basename(serverModel.sourcePath()) });
+});
+
+// Acknowledge client finished operation, set server ready for next process
+serverApp.get(SET_CLIENT_FINISH_EP, (req, res) => {
+  console.log(`${SET_CLIENT_FINISH_EP} endpoint`);
+  res.end();
+
+  serverModel.setIdle();
+});
+
+
+
+function onFilePathResult(data) {
+  console.log(`onFilePathResult: ${data}`);
+  console.log(data.length);
+  if (data.length > 1) {
+    serverModel.setProgress('Loading video metadata...');
+    serverModel.setSourcePath(getFilePath(data));
+
+    getFileMetadata();
+  }
 }
 
 function onFilePathError(data) {
-    console.log('testErrorFunction: ' + data);
+  const stringData = '' + data;
+  console.log('onFilePathError: ' + stringData);
+  if (stringData.indexOf('Get-File') === 0) {
+    // Separate first line of error message
+    let index = stringData.indexOf("\n");
+    if (index === -1) index = undefined;
+    serverModel.setError(stringData.substring(0, index));
+  }
 }
 
-serverApp.get(GET_FILE_PATH_EP, (req, res) => {
-    console.log(`${GET_FILE_PATH_EP} endpoint`);
-    PreviewFileProgress = 'PROGRESS';
-    // console.log(req)
-    res.send('response is sent');
-    //res.end()
-    openDialog(onFilePathResult, onFilePathError, 1);
-    // DUMMY_onFilePathResult();
-  })
-
-serverApp.get(PROGRESS_EP, (req, res) => {
-  console.log(`${PROGRESS_EP} endpoint`);
-  res.send(PreviewFileProgress);
-});
-
-serverApp.get(GET_PREVIEW, (req, res) => {
-  console.log(`${GET_PREVIEW} endpoint`);
-
-  const { width, height, duration } = FileMetadata['streams'][0];
-  res.send({duration, previewFilePath: PreviewFilePath[0], fileName: path.basename(FilePath)});
-});
+/*
+function DUMMY_onFilePathResult() {
+  serverModel.setSourcePath('C:/Users/Admin/Documents/expressapp/big_buck_bunny_480p_h264.mov');
+  console.log('DUMMY_filepath> ' + serverModel.sourcePath());
+  onFileMetadata();
+}
+*/
 
 
-function onFileMetadata(filepath) {
-  console.log('filepath ' + filepath);
-  ffmpeg.ffprobe(filepath, function (err, metadata) {
-    console.log(filepath);
+
+
+function getFileMetadata() {
+  console.log(`getFileMetadata`);
+  ffmpeg.ffprobe(serverModel.sourcePath(), function (err, metadata) {
     try {
       // console.dir(metadata);
-      FileMetadata = metadata;
+      serverModel.setSourceMetadata(metadata);
       generatePreview();
     }
     catch (err) {
+      serverModel.setError(err);
       console.error('error> ' + err);
     }
     finally {
@@ -93,41 +138,28 @@ function onFileMetadata(filepath) {
   });
 }
 
-function getFilePath(data) {
-  // Cast byte buffer into string
-  const stringData = '' + data;
-  // Sanitize string for back slashes
-  const stringRaw = String.raw({ raw: [stringData] });
-  // Resolve into valid Node.js path
-  const filePath = path.resolve(stringRaw).replace(/\\/g, '/');
-
-  return filePath;
-};
-
 function generatePreview() {
-  //console.log(FilePath);
-  //console.log(FileMetadata);
-
-  const { width, height, duration } = FileMetadata['streams'][0];
+  console.dir('serverModel.getSourceFileMetadata()')
+  const { width, height, duration } = serverModel.sourceMetadata()['streams'][0];
   const pictureWidth = 160;
   const pictureHeight = Math.round(pictureWidth * height / width);
 
-  const timePosition = duration > 30 ? '00:00:10.000' : (duration > 2 ? '00:00:01.000' : '00:00:00.500');
+  const timePosition = duration > 30 ? '00:00:15.000' : (duration > 2 ? '00:00:05.000' : '00:00:00.500');
   const size = `${pictureWidth}x${pictureHeight}`;
 
-  const proc = ffmpeg(FilePath)
-  .on('filenames', function(filenames) {
-    console.log('screenshots are ' + filenames.join(', '));
-    PreviewFilePath = filenames;
-  })
-  .on('end', function() {
-    console.log('screenshots were saved');
-    PreviewFileProgress = 'FINISHED';
-  })
-  .on('error', function(err) {
-    console.log('an error happened: ' + err.message);
-  })
-  .screenshots({ fastSeek: true, timemarks: [ timePosition ], size, filename: 'tn_%b', folder: './static/preview'});
+  const proc = ffmpeg(serverModel.sourcePath())
+    .on('filenames', function (fileNames) {
+      console.log('screenshots are ' + fileNames.join(', '));
+      serverModel.setPreviewPath(fileNames[0])
+    })
+    .on('end', function () {
+      console.log('screenshots were saved');
+      serverModel.setFinished();
+    })
+    .on('error', function (err) {
+      console.log('an error happened: ' + err.message);
+    })
+    .screenshots({ fastSeek: true, timemarks: [timePosition], size, filename: 'tn_%b', folder: './static/preview' });
 }
 
 

@@ -24,7 +24,7 @@
 
     async function formOnClick() {
         const statusEl = document.getElementById('status');
-        statusEl.innerText = 'Loading video metadata...';
+        statusEl.innerText = 'Dialog is opened.';
 
         const buttonEl = document.getElementById('js_test');
         buttonEl.setAttribute("disabled", "disabled");
@@ -33,17 +33,24 @@
         let text = await response.text();
 
         console.log(text);
-        setTimeout(fetchPreviewProgress, 200);
+        setTimeout(fetchServerStatus, 200);
     }
 
-    async function fetchPreviewProgress() {
-        let response = await fetch('/progress');
+    async function fetchServerStatus() {
+        let response = await fetch('/serverStatus');
         let text = await response.text();
+        console.log('Server status ' + text);
+        const statusEl = document.getElementById('status');
 
-        if (text === 'PROGRESS') {
+        if (text === 'STATUS_PROGRESS') {
             console.log('progress')
-            setTimeout(fetchPreviewProgress, 200);
-        } else if (text === 'FINISHED') {
+            statusEl.innerText = 'Loading video metadata...';
+            setTimeout(fetchServerStatus, 200);
+        } else if (text === 'STATUS_DIALOG') {
+            console.log('dialog')
+            statusEl.innerText = 'Dialog is opened.';
+            setTimeout(fetchServerStatus, 200);
+        } else if (text === 'STATUS_FINISHED') {
             response = await fetch('/getPreview');
             text = await response.json();
 
@@ -53,7 +60,6 @@
             const imgEl = document.getElementById('preview_image');
             imgEl.src = '/preview/' + previewFilePath;
 
-            const statusEl = document.getElementById('status');
             statusEl.innerText = 'Video metadata loaded.';
 
             const buttonEl = document.getElementById('js_test');
@@ -61,11 +67,32 @@
 
             const fileNameEl = document.getElementById('file_name');
             fileNameEl.innerText = fileName;
+
+            console.log(new Date(duration * 1000).toISOString());
             
             const durationEl = document.getElementById('duration');
             durationEl.innerText = duration < 3600 
                 ? (new Date(duration * 1000).toISOString().substring(14, 19))
-                : (new Date(duration * 1000).toISOString().substring(11, 16));
+                : (new Date(duration * 1000).toISOString().substring(11, 19));
+
+            confirmFinish();
+        } else if (text === 'STATUS_ERROR') {
+            checkForError();
+        } else {
+            throw new Error(`PROGRESS_EP error, response not parsed: ${text}`);
+        }
+
+        async function checkForError() {
+            let response = await fetch('/serverStatusDetail');
+            let text = await response.text();
+            console.log(`Server Status DETAIL: ${text}`);
+            const statusEl = document.getElementById('status');
+            statusEl.innerText = text;
+            confirmFinish();
+        }
+
+        async function confirmFinish() {
+            let response = await fetch('/clientFinish');
         }
     }
 </script>
