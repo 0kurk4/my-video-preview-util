@@ -130,7 +130,7 @@ serverApp.get(SET_CLIENT_FINISH_EP, (req, res) => {
 
 
 function checkFFMpeg() {
-  ffmpeg.getAvailableFormats(function(err, formats) {
+  ffmpeg.getAvailableFormats(function (err, formats) {
     if (err != null || formats === undefined) {
       console.log(err);
       serverModel.setError('ERROR! FFMpeg is not installed on this system.');
@@ -211,22 +211,22 @@ function generatePreview() {
     previewEndHandler,
     serverModel.sourcePath(),
     config);
-  }
+}
 
-  function previewFilenamesHandler(fileNames) {
-    console.log('Preview file name is ' + fileNames[0]);
-    serverModel.setPreviewPath(fileNames[0]);
-  }
-  
-  function previewErrorHandler(err) {
-    console.log('an previewErrorHandler happened: ' + err.message);
-    serverModel.setError(err.message);
-  }
-  
-  function previewEndHandler() {
-    console.log('Preview was saved');
-    serverModel.setFinished(true, 'Preview is ready');
-  }
+function previewFilenamesHandler(fileNames) {
+  console.log('Preview file name is ' + fileNames[0]);
+  serverModel.setPreviewPath(fileNames[0]);
+}
+
+function previewErrorHandler(err) {
+  console.log('an previewErrorHandler happened: ' + err.message);
+  serverModel.setError(err.message);
+}
+
+function previewEndHandler() {
+  console.log('Preview was saved');
+  serverModel.setFinished(true, 'Preview is ready');
+}
 
 
 

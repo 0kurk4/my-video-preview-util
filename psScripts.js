@@ -61,15 +61,15 @@ const variants = [psScriptFolderBrowser, psScriptGetFile];
 
 async function openDialog(result, error, variant) {
     const child = spawn("powershell.exe", [variants[variant]]);
-    child.stdout.on("data",function(data){
+    child.stdout.on("data", function (data) {
         console.log("Powershell Data: " + data);
         return result(data);
     });
-    child.stderr.on("data",function(data){
+    child.stderr.on("data", function (data) {
         console.log("Powershell Errors: " + data);
         return error(data);
     });
-    child.on("exit",function(){
+    child.on("exit", function () {
         console.log("Powershell Script finished");
     });
     child.stdin.end();
