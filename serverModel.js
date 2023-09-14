@@ -1,7 +1,8 @@
 const STATUS_IDLE = 'STATUS_IDLE';
 const STATUS_DIALOG = 'STATUS_DIALOG';
 const STATUS_PROGRESS = 'STATUS_PROGRESS';
-const STATUS_FINISHED = 'STATUS_FINISHED';
+const STATUS_FINISHED_PREVIEW = 'STATUS_FINISHED_PREVIEW';
+const STATUS_FINISHED_THUMBNAILS = 'STATUS_FINISHED_THUMBNAILS';
 const STATUS_ERROR = 'STATUS_ERROR';
 
 function ServerAppModel(status = STATUS_IDLE) {
@@ -10,6 +11,7 @@ function ServerAppModel(status = STATUS_IDLE) {
     this.sourceFilePath = undefined;
     this.sourceFileMetadata = undefined;
     this.previewFilePath = undefined;
+    this.thumbnailsFilePath = undefined;
 }
 
 ////////////////////////////////////////////////
@@ -37,8 +39,8 @@ ServerAppModel.prototype.setDialog = function (detail = undefined) {
     this.serverStatusDetail = detail;
 }
 
-ServerAppModel.prototype.setFinished = function (detail = undefined) {
-    this.serverStatus = STATUS_FINISHED;
+ServerAppModel.prototype.setFinished = function (isPreview, detail = undefined) {
+    this.serverStatus = isPreview ? STATUS_FINISHED_PREVIEW : STATUS_FINISHED_THUMBNAILS;
     this.serverStatusDetail = detail;
 }
 
@@ -76,6 +78,14 @@ ServerAppModel.prototype.setPreviewPath = function (previewFilePath) {
     this.previewFilePath = previewFilePath;
 }
 
+ServerAppModel.prototype.thumbnailsPath = function () {
+    return this.thumbnailsFilePath;
+}
+
+ServerAppModel.prototype.setThumbnailsPath = function (thumbnailsFilePath) {
+    this.thumbnailsFilePath = thumbnailsFilePath;
+}
+
 ////////////////////////////////////////////////
 
 
@@ -84,6 +94,7 @@ module.exports = {
     STATUS_IDLE,
     STATUS_DIALOG,
     STATUS_PROGRESS,
-    STATUS_FINISHED,
+    STATUS_FINISHED_PREVIEW,
+    STATUS_FINISHED_THUMBNAILS,
     STATUS_ERROR
 }

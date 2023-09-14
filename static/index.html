@@ -6,22 +6,41 @@
 
 <body>
 
-  <h1>Content</h1>
+  <h1>My video preview util</h1>
 
 
 <h2 id="status">Ready</h2>
 
 <form>
     <input type="button" value="Select video file" id="select_video_btn" onclick="onSelectVideoBtnClick()" disabled />
+    <label for="thumbnail_count" id="thumbnail_count_label">Thumbnail count:</label>
+<select id="thumbnail_count" name="thumbnail_count" disabled>
+  <option value="1">1</option>
+  <option value="5" selected>5</option>
+  <option value="10">10</option>
+  <option value="30">30</option>
+</select>
+    <input type="button" value="Generate thumbnails" id="generate_thumbnails_btn" onclick="onGenerateThumbnailsBtnClick()" disabled />
+    <input type="button" value="STOP ANIMATION" id="stop_animation_btn" onclick="onStopAnimationBtnClick()" disabled />
 </form>
 
-<h3 id="file_name"></h3>
-<h4 id="duration"></h4>
+<h3 id="file_name">File name: <span></span></h3>
+<h4 id="duration">Duration: <span></span></h4>
 <img id="preview_image" />
+<h4>Metadata:</h4>
+<p id="metadata"></p>
 
 <script>
     console.log('Client start');
+
+    let serverStatusTimer;
+    let animationTimer;
+    const thumbnails = {};
+    
+    // init app - check if FFMpeg is available
     checkForFFMpeg();
+
+    ///////////////////
 
     async function checkForFFMpeg() {
         const response = await fetch('/serverStatus');
@@ -42,7 +61,31 @@
         const text = await response.text();
 
         // console.log(text);
-        setTimeout(fetchServerStatus, 200);
+        serverStatusTimer = setInterval(fetchServerStatus, 200);
+    }
+
+    async function onGenerateThumbnailsBtnClick() {
+        disableForm();
+
+        const thumbnailCount = document.getElementById('thumbnail_count').value;
+        console.log(thumbnailCount);
+
+        const response = await fetch('/generateThumbnails', {
+            method: 'POST',
+            headers: {
+                 'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({count: thumbnailCount}),
+        });
+
+        const text = await response.text();
+        console.log(text);
+
+        serverStatusTimer = setInterval(fetchServerStatus, 200);
+    }
+
+    function onStopAnimationBtnClick() {
+        clearInterval(animationTimer);
     }
 
     async function fetchServerStatus() {
@@ -59,15 +102,22 @@
             // case 'STATUS_DIALOG':
             //     handleDialog();
             //     break;
-            case 'STATUS_FINISHED':
-                handleFinished();
+            case 'STATUS_FINISHED_PREVIEW':
+                handleFinishedPreview();
                 fetchMetadata();
+                clearInterval(serverStatusTimer);
+                break;
+            case 'STATUS_FINISHED_THUMBNAILS':
+                handleFinishedThumbnails();
+                clearInterval(serverStatusTimer);
                 break;
             case 'STATUS_ERROR':
                 handleError();
+                clearInterval(serverStatusTimer);
                 break;
             default:
                 throw new Error(`STATUS_EP error, response not parsed: ${text}`);
+                clearInterval(serverStatusTimer);
         }
     }
 
@@ -77,20 +127,23 @@
 
         const decoded = JSON.parse(new TextDecoder().decode(base64ToBytes(text)));
         console.dir(decoded);
+
+        const metadataEl = document.getElementById('metadata');
+        metadataEl.innerText = JSON.stringify(decoded);
     }
 
     function handleProgress() {
         console.log('handleProgress');
-        setTimeout(fetchServerStatus, 200);
+        // setTimeout(fetchServerStatus, 200);
     }
 
     function handleDialog() {
         console.log('handleDialog');
-        setTimeout(fetchServerStatus, 200);
+        // setTimeout(fetchServerStatus, 200);
     }
 
-    async function handleFinished() {
-        console.log('handleFinished');
+    async function handleFinishedPreview() {
+        console.log('handleFinishedPreview');
         const response = await fetch('/getPreview');
         const text = await response.json();
 
@@ -100,16 +153,31 @@
         const imgEl = document.getElementById('preview_image');
         imgEl.src = '/preview/' + previewFilePath;
 
-        const fileNameEl = document.getElementById('file_name');
+        const fileNameEl = document.getElementById('file_name').getElementsByTagName('span')[0];
         fileNameEl.innerText = fileName;
         
-        const durationEl = document.getElementById('duration');
+        const durationEl = document.getElementById('duration').getElementsByTagName('span')[0];
         durationEl.innerText = duration < 3600 
             ? (new Date(duration * 1000).toISOString().substring(14, 19))
             : (new Date(duration * 1000).toISOString().substring(11, 19));
 
         confirmFinish();
-        enableForm();
+        enableForm(false);
+    }
+
+    async function handleFinishedThumbnails() {
+        console.log('handleFinishedPreview');
+        const response = await fetch('/getThumbnails');
+        const text = await response.json();
+
+        console.log(text);
+
+        thumbnails['filenames'] = text['thumbnailsFilePath'];
+        thumbnails['index'] = 0;
+        animationTimer = setInterval(onThumbnailAnimation, 400);
+
+        confirmFinish();
+        enableForm(false);
     }
 
     async function handleError() {
@@ -134,14 +202,47 @@
         const response = await fetch('/clientFinish');
     }
 
-    function disableForm() {
-        const buttonEl = document.getElementById('select_video_btn');
-        buttonEl.setAttribute("disabled", "disabled");
+    function onThumbnailAnimation() {
+        const imgEl = document.getElementById('preview_image');
+        const { filenames, index } = thumbnails;
+        console.log(`index: ${index}`);
+        console.log(`name: ${filenames[index]}`);
+        imgEl.src = '/thumbnails/' + filenames[index];
+
+        if (index < filenames.length - 1) thumbnails['index']++
+        else thumbnails['index'] = 0;
     }
 
-    function enableForm() {
+    function disableForm() {
+        const selectVideoButtonEl = document.getElementById('select_video_btn');
+        selectVideoButtonEl.setAttribute("disabled", "disabled");
+
+            const generateThumbnailsButtonEl = document.getElementById('generate_thumbnails_btn');
+            generateThumbnailsButtonEl.setAttribute("disabled", "disabled");
+            
+            const thumbnailCountEl = document.getElementById('thumbnail_count');
+            thumbnailCountEl.setAttribute("disabled", "disabled");
+            
+            const stopAnimationButtonEL = document.getElementById('stop_animation_btn');
+            stopAnimationButtonEL.setAttribute("disabled", "disabled");
+
+            clearInterval(animationTimer);
+    }
+
+    function enableForm(previewOnly = true) {
         const buttonEl = document.getElementById('select_video_btn');
         buttonEl.removeAttribute("disabled");
+
+        if (!previewOnly) {
+            const generateThumbnailsButtonEl = document.getElementById('generate_thumbnails_btn');
+            generateThumbnailsButtonEl.removeAttribute("disabled");
+
+            const thumbnailCountEl = document.getElementById('thumbnail_count');
+            thumbnailCountEl.removeAttribute("disabled");
+            
+            const stopAnimationButtonEL = document.getElementById('stop_animation_btn');
+            stopAnimationButtonEL.removeAttribute("disabled");
+        }
     }
 
     function base64ToBytes(base64) {

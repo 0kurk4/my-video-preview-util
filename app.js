@@ -11,7 +11,9 @@ const {
   GET_DIRECTORY_PATH_EP,
   SERVER_STATUS_EP,
   SERVER_STATUS_DETAIL_EP,
+  GENERATE_THUMBNAILS_EP,
   GET_PREVIEW_EP,
+  GET_THUMBNAILS_EP,
   GET_METADATA_EP,
   SET_CLIENT_FINISH_EP
 } = require('./serverAppCfg');
@@ -36,6 +38,9 @@ const {
   getTimePosition
 } = require('./utils');
 
+
+serverApp.use(express.json()) // for parsing application/json
+// serverApp.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
 // Map root folder
 serverApp.use(express.static(__dirname + '/static'));
@@ -77,11 +82,23 @@ serverApp.get(SERVER_STATUS_DETAIL_EP, (req, res) => {
   res.send(base64);
 });
 
+// Generate $count of thumbnails
+serverApp.post(GENERATE_THUMBNAILS_EP, (req, res) => {
+  console.log(`${GENERATE_THUMBNAILS_EP} endpoint`);
+
+  console.log(req.body);
+  const count = req.body.count;
+  res.send(`THUMBNAILS ENDPOINT will generate ${count} thumbs`);
+
+  serverModel.setProgress('Preparing thumbnails...');
+  generateThumbnails(count);
+});
+
 // Retrieve preview picture
 serverApp.get(GET_PREVIEW_EP, (req, res) => {
   console.log(`${GET_PREVIEW_EP} endpoint`);
 
-  const { width, height, duration } = getVideoStreamFromMetadata(serverModel.sourceMetadata());
+  const { duration } = getVideoStreamFromMetadata(serverModel.sourceMetadata());
   res.send({ duration, previewFilePath: serverModel.previewPath(), fileName: path.basename(serverModel.sourcePath()) });
 });
 
@@ -92,6 +109,15 @@ serverApp.get(GET_METADATA_EP, (req, res) => {
   const metadata = serverModel.sourceMetadata();
   const base64 = bytesToBase64(new TextEncoder().encode(JSON.stringify(metadata)));
   res.send(base64);
+});
+
+// Retrieve thumbnails
+serverApp.get(GET_THUMBNAILS_EP, (req, res) => {
+  console.log(`${GET_THUMBNAILS_EP} endpoint`);
+
+  const metadata = serverModel.thumbnailsPath();
+  const base64 = bytesToBase64(new TextEncoder().encode(JSON.stringify(metadata)));
+  res.send({ thumbnailsFilePath: serverModel.thumbnailsPath() });
 });
 
 // Acknowledge client finished operation, set server ready for next process
@@ -136,13 +162,13 @@ function onFilePathError(data) {
   }
 }
 
-/*
+
 function DUMMY_onFilePathResult() {
-  serverModel.setSourcePath('C:/Users/Admin/Documents/expressapp/big_buck_bunny_480p_h264.mov');
+  serverModel.setSourcePath('C:/Users/Admin/Documents/ffmpeg/big_buck_bunny_480p_h264.mov');
   console.log('DUMMY_filepath> ' + serverModel.sourcePath());
-  onFileMetadata();
+  getFileMetadata();
 }
-*/
+
 
 
 
@@ -172,23 +198,82 @@ function generatePreview() {
   const timePosition = getTimePosition(duration);
   const size = getPictureSize(width, height);
 
-  const proc = ffmpeg(serverModel.sourcePath())
-    .on('filenames', function (fileNames) {
-      console.log('Preview file name is ' + fileNames.join(''));
-      serverModel.setPreviewPath(fileNames[0]);
-    })
-    .on('end', function () {
-      console.log('Preview was saved');
-      serverModel.setFinished('Preview is ready');
-    })
-    .on('error', function (err) {
-      serverModel.setError(err.message);
-      console.log('an error happened: ' + err.message);
-    })
-    .screenshots({ fastSeek: true, timemarks: [timePosition], size, filename: 'prev_%b', folder: './static/preview' });
+  const config = {
+    fastSeek: true,
+    size,
+    folder: './static/preview',
+    filename: `prev_%b`,
+    timemarks: [timePosition]
+  }
+
+  getScreenshots(previewFilenamesHandler,
+    previewErrorHandler,
+    previewEndHandler,
+    serverModel.sourcePath(),
+    config);
+  }
+
+  function previewFilenamesHandler(fileNames) {
+    console.log('Preview file name is ' + fileNames[0]);
+    serverModel.setPreviewPath(fileNames[0]);
+  }
+  
+  function previewErrorHandler(err) {
+    console.log('an previewErrorHandler happened: ' + err.message);
+    serverModel.setError(err.message);
+  }
+  
+  function previewEndHandler() {
+    console.log('Preview was saved');
+    serverModel.setFinished(true, 'Preview is ready');
+  }
+
+
+
+function generateThumbnails(count) {
+  const { width, height } = getVideoStreamFromMetadata(serverModel.sourceMetadata());
+  const size = getPictureSize(width, height);
+
+  const config = {
+    fastSeek: false,
+    size,
+    folder: './static/thumbnails',
+    filename: `thumb_%b`,
+    count
+  }
+
+  getScreenshots(thumbnailsFilenamesHandler,
+    thumbnailsErrorHandler,
+    thumbnailsEndHandler,
+    serverModel.sourcePath(),
+    config);
+}
+
+function thumbnailsFilenamesHandler(fileNames) {
+  console.log('Thumbnails are ' + fileNames.join(', '));
+  serverModel.setThumbnailsPath(fileNames);
+}
+
+function thumbnailsErrorHandler(err) {
+  console.log('an thumbnailsErrorHandler happened: ' + err.message);
+  serverModel.setError(err.message);
+}
+
+function thumbnailsEndHandler() {
+  console.log('Thumbnails were saved');
+  serverModel.setFinished(false, 'Thumbnails are ready');
 }
 
 
 
+function getScreenshots(onFileNames, onError, onEnd, sourcePath, config) {
+  console.log(`getScreenshots\n${JSON.stringify(config)}\n`);
+
+  const proc = ffmpeg(sourcePath)
+    .on('filenames', onFileNames)
+    .on('end', onEnd)
+    .on('error', onError)
+    .screenshots(config);
+}
 
 
