@@ -40,7 +40,6 @@ const {
 
 
 serverApp.use(express.json()) // for parsing application/json
-// serverApp.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
 // Map root folder
 serverApp.use(express.static(__dirname + '/static'));
@@ -86,7 +85,6 @@ serverApp.get(SERVER_STATUS_DETAIL_EP, (req, res) => {
 serverApp.post(GENERATE_THUMBNAILS_EP, (req, res) => {
   console.log(`${GENERATE_THUMBNAILS_EP} endpoint`);
 
-  console.log(req.body);
   const count = req.body.count;
   res.send(`THUMBNAILS ENDPOINT will generate ${count} thumbs`);
 
@@ -162,15 +160,13 @@ function onFilePathError(data) {
   }
 }
 
-
+/*
 function DUMMY_onFilePathResult() {
   serverModel.setSourcePath('C:/Users/Admin/Documents/ffmpeg/big_buck_bunny_480p_h264.mov');
   console.log('DUMMY_filepath> ' + serverModel.sourcePath());
   getFileMetadata();
 }
-
-
-
+*/
 
 
 function getFileMetadata() {
@@ -188,7 +184,7 @@ function getFileMetadata() {
       console.error('error> ' + err);
     }
     finally {
-      console.log('getFileMetadata finaly');
+      // console.log('getFileMetadata finaly');
     }
   });
 }

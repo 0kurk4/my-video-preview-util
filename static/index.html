@@ -49,7 +49,6 @@
         async function checkForFFMpeg() {
             const response = await fetch('/serverStatus');
             const text = await response.text();
-            console.log(`checkForFFMpeg ${text}`);
 
             if (text === 'STATUS_ERROR') {
                 getStatusDetail();
@@ -62,9 +61,7 @@
             disableForm();
 
             const response = await fetch('/getFilePath');
-            const text = await response.text();
 
-            // console.log(text);
             serverStatusTimer = setInterval(fetchServerStatus, 200);
         }
 
@@ -72,7 +69,6 @@
             disableForm();
 
             const thumbnailCount = document.getElementById('thumbnail_count').value;
-            console.log(thumbnailCount);
 
             const response = await fetch('/generateThumbnails', {
                 method: 'POST',
@@ -81,9 +77,6 @@
                 },
                 body: JSON.stringify({ count: thumbnailCount }),
             });
-
-            const text = await response.text();
-            console.log(text);
 
             serverStatusTimer = setInterval(fetchServerStatus, 200);
         }
@@ -96,7 +89,6 @@
             const response = await fetch('/serverStatus');
             const text = await response.text();
 
-            // console.log('Server status ' + text);
             getStatusDetail();
             switch (text) {
                 case 'STATUS_PROGRESS':
@@ -130,7 +122,6 @@
             const text = await response.text();
 
             const decoded = JSON.parse(new TextDecoder().decode(base64ToBytes(text)));
-            console.dir(decoded);
 
             const metadataEl = document.getElementById('metadata');
             metadataEl.innerText = JSON.stringify(decoded);
@@ -138,20 +129,16 @@
 
         function handleProgress() {
             console.log('handleProgress');
-            // setTimeout(fetchServerStatus, 200);
         }
 
         function handleDialog() {
             console.log('handleDialog');
-            // setTimeout(fetchServerStatus, 200);
         }
 
         async function handleFinishedPreview() {
             console.log('handleFinishedPreview');
             const response = await fetch('/getPreview');
             const text = await response.json();
-
-            console.log(text);
 
             const { duration, previewFilePath, fileName } = text;
             const imgEl = document.getElementById('preview_image');
@@ -173,8 +160,6 @@
             console.log('handleFinishedPreview');
             const response = await fetch('/getThumbnails');
             const text = await response.json();
-
-            console.log(text);
 
             thumbnails['filenames'] = text['thumbnailsFilePath'];
             thumbnails['index'] = 0;
@@ -209,8 +194,7 @@
         function onThumbnailAnimation() {
             const imgEl = document.getElementById('preview_image');
             const { filenames, index } = thumbnails;
-            console.log(`index: ${index}`);
-            console.log(`name: ${filenames[index]}`);
+
             imgEl.src = '/thumbnails/' + filenames[index];
 
             if (index < filenames.length - 1) thumbnails['index']++
